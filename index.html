@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rekod Penerimaan dan Pengeluaran Stok</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Perpustakaan SheetJS untuk jana fail Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            darkblue: '#1e3a8a', // Untuk header
+                            yellow: '#fcd34d',   // Untuk highlight
+                            teal: '#2dd4bf',     // Untuk Diterima
+                            gold: '#fbbf24',     // Untuk Baki Semasa
+                            lightbg: '#f0f9ff'   // Untuk Background
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #e0f2fe;
+            background-image: radial-gradient(#bae6fd 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .table-rounded {
+            border-collapse: separate;
+            border-spacing: 0;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .table-rounded th:first-child { border-top-left-radius: 12px; }
+        .table-rounded th:last-child { border-top-right-radius: 12px; }
+        
+        .pill-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 1.5rem;
+            border-radius: 9999px;
+            font-weight: 700;
+        }
+
+        /* Modal transitions */
+        .modal-active {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+        .modal-inactive {
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen p-4 md:p-8 flex flex-col items-center">
+
+    <!-- Main Container -->
+    <div class="w-full max-w-6xl bg-white rounded-3xl shadow-xl border-4 border-blue-50 overflow-hidden relative">
+        
+        <!-- Header Banner -->
+        <div class="bg-brand-darkblue relative py-6 px-4 text-center border-b-8 border-brand-yellow">
+            <!-- Decorative Icons -->
+            <div class="absolute left-4 top-4 hidden md:block text-white/20 text-5xl"><i class="fa-solid fa-clipboard-list"></i></div>
+            <div class="absolute right-4 top-4 hidden md:block text-white/20 text-5xl"><i class="fa-solid fa-box-open"></i></div>
+            
+            <h1 class="text-2xl md:text-3xl font-bold text-white tracking-wide">
+                REKOD PENERIMAAN DAN PENGELUARAN STOK
+            </h1>
+            <h2 class="text-xl md:text-2xl font-bold text-brand-yellow mt-1">
+                PEJABAT SEKTOR PEMBELAJARAN PPD RANAU
+            </h2>
+        </div>
+
+        <div class="p-6 md:p-8 bg-brand-lightbg flex flex-col items-center">
+            
+            <!-- Butang Tindakan Atas -->
+            <div class="flex flex-wrap justify-center gap-3 mb-6 -mt-10 relative z-10 w-full">
+                <!-- Tambah Jenis Stok Button -->
+                <button onclick="openModal('modal-tambah')" class="bg-blue-100 hover:bg-blue-200 text-blue-900 border-2 border-blue-300 font-bold py-2 px-4 rounded-full shadow-sm transition-transform hover:scale-105 flex items-center gap-2 text-sm md:text-base">
+                    <i class="fa-solid fa-plus"></i> TAMBAH STOK
+                </button>
+
+                <!-- Edit Jenis Stok Button (BARU) -->
+                <button onclick="openModal('modal-edit-auth')" class="bg-orange-100 hover:bg-orange-200 text-orange-900 border-2 border-orange-300 font-bold py-2 px-4 rounded-full shadow-sm transition-transform hover:scale-105 flex items-center gap-2 text-sm md:text-base">
+                    <i class="fa-solid fa-pen-to-square"></i> EDIT STOK
+                </button>
+                
+                <!-- Rekod Transaksi Button -->
+                <button onclick="openModal('modal-sejarah')" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-900 border-2 border-indigo-300 font-bold py-2 px-4 rounded-full shadow-sm transition-transform hover:scale-105 flex items-center gap-2 text-sm md:text-base">
+                    <i class="fa-solid fa-clock-rotate-left"></i> REKOD TRANSAKSI
+                </button>
+                
+                <!-- Reset Data Button -->
+                <button onclick="openModal('modal-reset')" class="bg-red-100 hover:bg-red-200 text-red-900 border-2 border-red-300 font-bold py-2 px-4 rounded-full shadow-sm transition-transform hover:scale-105 flex items-center gap-2 text-sm md:text-base">
+                    <i class="fa-solid fa-trash-can"></i> RESET DATA
+                </button>
+            </div>
+
+            <!-- Main Data Table -->
+            <div class="w-full overflow-x-auto rounded-2xl shadow-sm border border-blue-100 bg-white">
+                <table class="w-full text-left table-rounded">
+                    <thead>
+                        <tr class="text-center text-sm md:text-base">
+                            <th class="bg-brand-darkblue text-white py-4 px-4 w-1/3">
+                                <i class="fa-solid fa-box mr-2"></i> JENIS STOK
+                            </th>
+                            <th class="bg-teal-500 text-white py-4 px-4 w-1/5">
+                                <i class="fa-solid fa-clipboard-check mr-2"></i> JUMLAH TERIMA
+                            </th>
+                            <th class="bg-brand-gold text-brand-darkblue py-4 px-4 w-1/5">
+                                <i class="fa-solid fa-share-from-square mr-2"></i> BAKI SEMASA
+                            </th>
+                            <th class="bg-gray-600 text-white py-4 px-4 w-1/4">
+                                <i class="fa-solid fa-note-sticky mr-2"></i> CATATAN
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body" class="text-sm md:text-base">
+                        <!-- Data will be populated here by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Bottom Action Buttons -->
+            <div class="mt-8 flex flex-col md:flex-row gap-4 w-full justify-center">
+                <!-- Terima Stok Button -->
+                <button onclick="openModal('modal-terima')" class="flex-1 max-w-md bg-pink-100 hover:bg-pink-200 border-2 border-pink-300 text-pink-900 font-bold py-3 px-6 rounded-2xl shadow-sm transition-transform hover:-translate-y-1 flex items-center justify-center gap-3 text-lg">
+                    <i class="fa-solid fa-hand-pointer text-2xl text-pink-500"></i> Klik sini untuk menerima stok
+                </button>
+                
+                <!-- Keluar Stok Button -->
+                <button onclick="openModal('modal-keluar')" class="flex-1 max-w-md bg-purple-100 hover:bg-purple-200 border-2 border-purple-300 text-purple-900 font-bold py-3 px-6 rounded-2xl shadow-sm transition-transform hover:-translate-y-1 flex items-center justify-center gap-3 text-lg">
+                    <i class="fa-solid fa-hand-pointer text-2xl text-purple-500"></i> Klik sini untuk pengeluaran stok
+                </button>
+            </div>
+            
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="mt-4 text-gray-500 text-sm font-medium mb-8">
+        Hak Cipta Terpelihara &copy; 2026. <span class="font-bold text-brand-darkblue">Created By Ijam</span>
+    </div>
+
+    <!-- ================= MODALS ================= -->
+
+    <!-- Modal: Tambah Jenis Stok -->
+    <div id="modal-tambah" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 transition-all duration-300 modal-inactive">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border-t-8 border-blue-400">
+            <div class="bg-blue-50 p-4 border-b border-blue-100 flex justify-between items-center">
+                <h3 class="font-bold text-blue-900 text-lg"><i class="fa-solid fa-plus-circle mr-2"></i> Tambah Jenis Stok Baru</h3>
+                <button onclick="closeModal('modal-tambah')" class="text-blue-500 hover:text-blue-800 text-xl"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <form id="form-tambah" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Nama Stok (Contoh: Kertas A4)</label>
+                    <input type="text" id="tambah-nama" required class="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Unit (Contoh: Kotak, Rim, Pcs)</label>
+                    <input type="text" id="tambah-unit" required class="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Catatan</label>
+                    <input type="text" id="tambah-catatan" class="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors mt-2">Simpan Stok Baru</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Auth (Pengesahan Kata Laluan untuk Edit) -->
+    <div id="modal-edit-auth" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 transition-all duration-300 modal-inactive">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border-t-8 border-orange-500">
+            <div class="bg-orange-50 p-4 border-b border-orange-100 flex justify-between items-center">
+                <h3 class="font-bold text-orange-900 text-lg"><i class="fa-solid fa-lock mr-2"></i> Pengesahan Keselamatan</h3>
+                <button onclick="closeModal('modal-edit-auth')" class="text-orange-500 hover:text-orange-800 text-xl"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <form id="form-edit-auth" class="p-6 space-y-4">
+                <p class="text-sm text-gray-700 text-center font-medium leading-relaxed">
+                    Sila masukkan kata laluan untuk mengubah suai atau memadam jenis stok.
+                </p>
+                <div>
+                    <input type="password" id="edit-password" required placeholder="********" class="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 text-center tracking-widest font-bold">
+                </div>
+                <button type="submit" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors mt-2">Sahkan</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Jenis Stok (Menu Utama Edit) -->
+    <div id="modal-edit-main" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 transition-all duration-300 modal-inactive">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border-t-8 border-amber-500">
+            <div class="bg-amber-50 p-4 border-b border-amber-100 flex justify-between items-center">
+                <h3 class="font-bold text-amber-900 text-lg"><i class="fa-solid fa-pen-to-square mr-2"></i> Edit / Padam Stok</h3>
+                <button onclick="closeModal('modal-edit-main')" class="text-amber-500 hover:text-amber-800 text-xl"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Pilih Stok Yang Ingin Diedit</label>
+                    <select id="edit-select-item" onchange="loadEditData()" class="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white">
+                        <!-- Options injected by JS -->
+                    </select>
+                </div>
+                
+                <form id="form-edit-stok" class="space-y-4 hidden">
+                    <input type="hidden" id="edit-id">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Nama Stok Baru</label>
+                        <input type="text" id="edit-nama" required class="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none uppercase">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Unit Baru</label>
+                        <input type="text" id="edit-unit" required class="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none uppercase">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Kemaskini Catatan (Jika Perlu)</label>
+                        <input type="text" id="edit-catatan" class="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none">
+                    </div>
+                    
+                    <div class="flex gap-2 mt-6 border-t pt-4">
+                        <button type="submit" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-lg shadow-md transition-colors text-sm">Simpan</button>
+                        <!-- Butang padam dengan logik "klik 2 kali untuk sahkan" -->
+                        <button type="button" id="btn-delete-stok" onclick="handleDeleteClick()" data-confirm="false" class="flex-1 bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 font-bold py-3 rounded-lg shadow-md transition-colors text-sm">
+                            <i class="fa-solid fa-trash-can"></i> Padam
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Terima Stok -->
+    <div id="modal-terima" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 transition-all duration-300 modal-inactive">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border-t-8 border-pink-400">
+            <div class="bg-pink-50 p-4 border-b border-pink-100 flex justify-between items-center">
+                <h3 class="font-bold text-pink-900 text-lg"><i class="fa-solid fa-box-open mr-2"></i> Penerimaan Stok Baru</h3>
+                <button onclick="closeModal('modal-terima')" class="text-pink-500 hover:text-pink-800 text-xl"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <form id="form-terima" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Tarikh Terima</label>
+                    <input type="date" id="terima-tarikh" required class="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Jenis Stok</label>
+                    <select id="terima-item" required class="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 bg-white"></select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Jumlah Diterima</label>
+                    <input type="number" id="terima-qty" min="1" required class="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Catatan</label>
+                    <input type="text" id="terima-catatan" placeholder="Contoh: Stok dari Pembekal A" class="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500">
+                </div>
+                <button type="submit" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 rounded-lg shadow-md transition-colors mt-2">Sahkan Penerimaan</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Pengeluaran Stok -->
+    <div id="modal-keluar" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 transition-all duration-300 modal-inactive">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border-t-8 border-purple-400">
+            <div class="bg-purple-50 p-4 border-b border-purple-100 flex justify-between items-center">
+                <h3 class="font-bold text-purple-900 text-lg"><i class="fa-solid fa-dolly mr-2"></i> Pengeluaran Stok</h3>
+                <button onclick="closeModal('modal-keluar')" class="text-purple-500 hover:text-purple-800 text-xl"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <form id="form-keluar" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Tarikh Pengeluaran</label>
+                    <input type="date" id="keluar-tarikh" required class="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Jenis Stok</label>
+                    <select id="keluar-item" required onchange="updateKuantitiKeluar()" class="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 bg-white">
+                        <!-- Options injected by JS -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Jumlah Pengeluaran</label>
+                    <select id="keluar-qty" required class="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 bg-white disabled:bg-gray-100 disabled:text-gray-500">
+                        <option value="">Pilih Jenis Stok Dahulu</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Catatan</label>
+                    <input type="text" id="keluar-catatan" placeholder="Contoh: Untuk Kegunaan Mesyuarat" class="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 bg-white">
+                </div>
+                <button type="submit" id="btn-submit-keluar" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 rounded-lg shadow-md transition-colors mt-2">Sahkan Pengeluaran</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Reset Data -->
+    <div id="modal-reset" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 transition-all duration-300 modal-inactive">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border-t-8 border-red-500">
+            <div class="bg-red-50 p-4 border-b border-red-100 flex justify-between items-center">
+                <h3 class="font-bold text-red-900 text-lg"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Kosongkan Data</h3>
+                <button onclick="closeModal('modal-reset')" class="text-red-500 hover:text-red-800 text-xl"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <form id="form-reset" class="p-6 space-y-4">
+                <div class="text-center text-red-600 mb-2">
+                    <i class="fa-solid fa-circle-exclamation text-4xl"></i>
+                </div>
+                <p class="text-sm text-gray-700 text-center font-medium leading-relaxed">
+                    Amaran: Tindakan ini akan memadam <b>semua jenis stok</b> dan <b>rekod transaksi</b> secara kekal.
+                </p>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1 text-center">Masukkan Kata Laluan</label>
+                    <input type="password" id="reset-password" required placeholder="********" class="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-red-500 focus:ring-2 focus:ring-red-200 text-center tracking-widest font-bold">
+                </div>
+                <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors mt-2">Sah & Kosongkan Stok</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+
+    <!-- Modal: Sejarah Transaksi -->
+    <div id="modal-sejarah" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 transition-all duration-300 modal-inactive">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-indigo-600 p-4 flex justify-between items-center text-white">
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-clipboard-list mr-2"></i> Rekod Keseluruhan Transaksi</h3>
+                <div class="flex items-center gap-3">
+                    <button onclick="downloadHistoryExcel()" class="bg-indigo-500 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 border border-indigo-400">
+                        <i class="fa-solid fa-file-excel"></i> Muat Turun XLS
+                    </button>
+                    <button onclick="closeModal('modal-sejarah')" class="text-indigo-200 hover:text-white text-xl ml-2"><i class="fa-solid fa-times"></i></button>
+                </div>
+            </div>
+            
+            <div class="flex flex-col h-full overflow-hidden">
+                <!-- Tabs -->
+                <div class="flex border-b border-gray-200 bg-gray-50">
+                    <button id="btn-tab-terima" onclick="switchHistoryTab('terima')" class="flex-1 py-3 px-4 font-bold text-sm md:text-base transition-colors bg-teal-500 text-white">
+                        <i class="fa-solid fa-box-open mr-2"></i> Rekod Penerimaan
+                    </button>
+                    <button id="btn-tab-keluar" onclick="switchHistoryTab('keluar')" class="flex-1 py-3 px-4 font-bold text-sm md:text-base transition-colors bg-gray-200 text-gray-600 hover:bg-gray-300">
+                        <i class="fa-solid fa-dolly mr-2"></i> Rekod Pengeluaran
+                    </button>
+                </div>
+
+                <!-- Tab Content: Terima -->
+                <div id="content-terima" class="p-0 overflow-y-auto flex-1">
+                    <table class="w-full text-left">
+                        <thead class="bg-teal-50 sticky top-0">
+                            <tr class="text-teal-900 text-sm">
+                                <th class="py-3 px-4">Tarikh Terima</th>
+                                <th class="py-3 px-4">Jenis Stok</th>
+                                <th class="py-3 px-4 text-center">Jumlah Diterima</th>
+                                <th class="py-3 px-4">Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-sejarah-terima" class="text-sm">
+                            <!-- Data injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Tab Content: Keluar -->
+                <div id="content-keluar" class="p-0 overflow-y-auto flex-1 hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-purple-50 sticky top-0">
+                            <tr class="text-purple-900 text-sm">
+                                <th class="py-3 px-4">Tarikh Keluar</th>
+                                <th class="py-3 px-4">Jenis Stok</th>
+                                <th class="py-3 px-4 text-center">Jumlah Dikeluarkan</th>
+                                <th class="py-3 px-4">Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-sejarah-keluar" class="text-sm">
+                            <!-- Data injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= JAVASCRIPT LOGIC ================= -->
+    <script>
+        
+        // Data lalai (Default Data)
+        const defaultData = [
+            { id: 1, name: "KERTAS A4", unit: "KOTAK", received: 5, issued: 0, icon: "fa-file-lines", notes: "" },
+            { id: 2, name: "KERTAS SIJIL", unit: "RIM", received: 5, issued: 0, icon: "fa-certificate", notes: "" },
+            { id: 3, name: "FOLDER SIJIL", unit: "PCS", received: 10, issued: 0, icon: "fa-folder-open", notes: "" },
+            { id: 4, name: "PEN", unit: "PCS", received: 10, issued: 0, icon: "fa-pen", notes: "" },
+            { id: 5, name: "PEMADAM", unit: "PCS", received: 10, issued: 0, icon: "fa-eraser", notes: "" },
+            { id: 6, name: "PEMBARIS", unit: "PCS", received: 10, issued: 0, icon: "fa-ruler", notes: "" }
+        ];
+
+        // Tarik data dari Local Storage atau guna default
+        let inventoryData = JSON.parse(localStorage.getItem('stokPPDData')) || defaultData;
+        let nextId = parseInt(localStorage.getItem('stokPPDNextId')) || 7;
+        
+        // Data Sejarah Transaksi
+        let transactionHistory = JSON.parse(localStorage.getItem('stokPPDHistory')) || [];
+
+        function saveData() {
+            localStorage.setItem('stokPPDData', JSON.stringify(inventoryData));
+            localStorage.setItem('stokPPDNextId', nextId.toString());
+            localStorage.setItem('stokPPDHistory', JSON.stringify(transactionHistory));
+        }
+
+        function calculateBalance(item) {
+            return item.received - item.issued;
+        }
+
+        // --- STREAMING_CHUNK:Javascript Logic - UI Rendering... ---
+        
+        // Fungsi melukis jadual (Render Table)
+        function renderTable() {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+
+            inventoryData.forEach((item, index) => {
+                const balance = calculateBalance(item);
+                const bgClass = index % 2 === 0 ? 'bg-white' : 'bg-blue-50/50';
+                const tr = document.createElement('tr');
+                tr.className = `${bgClass} border-b border-gray-100 hover:bg-blue-100 transition-colors`;
+                
+                // Gunakan ikon default jika tiada
+                const iconClass = item.icon || 'fa-box';
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 flex items-center font-bold text-gray-700">
+                        <div class="w-8 h-8 rounded bg-blue-100 text-blue-600 flex items-center justify-center mr-3">
+                            <i class="fa-solid ${iconClass}"></i>
+                        </div>
+                        ${item.name}
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="pill-number bg-teal-100 text-teal-800">${item.received}</span> 
+                        <span class="text-gray-500 font-medium ml-1">${item.unit}</span>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="pill-number bg-yellow-100 text-yellow-700">${balance}</span> 
+                        <span class="text-gray-500 font-medium ml-1">${item.unit}</span>
+                    </td>
+                    <td class="py-3 px-4 text-gray-600 text-sm">
+                        ${item.notes || '-'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            populateDropdowns();
+        }
+
+        // Pengurusan Modal
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            modal.classList.remove('modal-inactive');
+            modal.classList.add('modal-active');
+
+            // Set tarikh default hari ini untuk transaksi
+            const today = new Date().toISOString().split('T')[0];
+            
+            if(id === 'modal-terima') {
+                document.getElementById('terima-tarikh').value = today;
+                document.getElementById('terima-item').value = "";
+                document.getElementById('terima-qty').value = "";
+                document.getElementById('terima-catatan').value = ""; 
+            }
+            if(id === 'modal-keluar') {
+                document.getElementById('keluar-tarikh').value = today;
+                document.getElementById('keluar-item').value = ""; 
+                document.getElementById('keluar-catatan').value = ""; 
+                updateKuantitiKeluar(); 
+            }
+            if(id === 'modal-tambah') document.getElementById('form-tambah').reset();
+            if(id === 'modal-reset') document.getElementById('form-reset').reset();
+            if(id === 'modal-edit-auth') document.getElementById('form-edit-auth').reset();
+            
+            // Render sejarah jika modal sejarah dibuka
+            if(id === 'modal-sejarah') {
+                renderHistory();
+                switchHistoryTab('terima');
+            }
+        }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            modal.classList.remove('modal-active');
+            modal.classList.add('modal-inactive');
+        }
+
+        // --- STREAMING_CHUNK:Javascript Logic - Form Operations... ---
+
+        // Isi <select> dropdown untuk modal Terima, Keluar, dan Edit
+        function populateDropdowns() {
+            const terimaSelect = document.getElementById('terima-item');
+            const keluarSelect = document.getElementById('keluar-item');
+            const editSelect = document.getElementById('edit-select-item');
+            
+            let optionsHTML = '<option value="">-- Pilih Jenis Stok --</option>';
+            
+            inventoryData.forEach(item => {
+                optionsHTML += `<option value="${item.id}">${item.name}</option>`;
+            });
+
+            if(terimaSelect) terimaSelect.innerHTML = optionsHTML;
+            if(keluarSelect) keluarSelect.innerHTML = optionsHTML;
+            if(editSelect) editSelect.innerHTML = optionsHTML;
+        }
+
+        // Dinamik Kuantiti Pengeluaran
+        window.updateKuantitiKeluar = function() {
+            const itemSelect = document.getElementById('keluar-item');
+            const qtySelect = document.getElementById('keluar-qty');
+            const btnSubmit = document.getElementById('btn-submit-keluar');
+            
+            const itemId = parseInt(itemSelect.value);
+            qtySelect.innerHTML = ''; 
+            
+            if (!itemId) {
+                qtySelect.innerHTML = '<option value="">Pilih Jenis Stok Dahulu</option>';
+                qtySelect.disabled = true;
+                btnSubmit.disabled = true;
+                return;
+            }
+
+            const item = inventoryData.find(x => x.id === itemId);
+            const balance = calculateBalance(item);
+
+            if (balance <= 0) {
+                qtySelect.innerHTML = '<option value="">Stok habis</option>';
+                qtySelect.disabled = true;
+                btnSubmit.disabled = true;
+                btnSubmit.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                qtySelect.disabled = false;
+                btnSubmit.disabled = false;
+                btnSubmit.classList.remove('opacity-50', 'cursor-not-allowed');
+                
+                for (let i = 1; i <= balance; i++) {
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.text = i;
+                    qtySelect.appendChild(opt);
+                }
+            }
+        }
+
+        // Submit Tambah Jenis Stok Baru
+        document.getElementById('form-tambah').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const name = document.getElementById('tambah-nama').value.trim().toUpperCase();
+            const unit = document.getElementById('tambah-unit').value.trim().toUpperCase();
+            const notes = document.getElementById('tambah-catatan').value.trim();
+            
+            inventoryData.push({
+                id: nextId++,
+                name: name,
+                unit: unit,
+                received: 0,
+                issued: 0,
+                icon: "fa-box", 
+                notes: notes
+            });
+            
+            saveData();
+            renderTable();
+            closeModal('modal-tambah');
+            showToast(`Stok ${name} berjaya ditambah!`);
+        });
+
+        // --- STREAMING_CHUNK:Javascript Logic - Edit & Delete... ---
+
+        // Pengesahan Kata Laluan untuk Edit Stok
+        document.getElementById('form-edit-auth').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const pwd = document.getElementById('edit-password').value;
+            
+            if (pwd === "12345678") {
+                closeModal('modal-edit-auth');
+                
+                // Set form edit ke keadaan asal
+                document.getElementById('form-edit-stok').classList.add('hidden');
+                document.getElementById('edit-select-item').value = "";
+                
+                // Buka modal edit utama
+                setTimeout(() => {
+                    openModal('modal-edit-main');
+                }, 300); // Tunggu sikit untuk animasi transition
+                
+            } else {
+                showToast("Kata laluan salah! Sila cuba lagi.", true);
+                document.getElementById('edit-password').value = "";
+            }
+        });
+
+        // Load data bila jenis stok dipilih di bahagian Edit
+        window.loadEditData = function() {
+            const select = document.getElementById('edit-select-item');
+            const form = document.getElementById('form-edit-stok');
+            const id = parseInt(select.value);
+            
+            // Reset keadaan butang padam setiap kali tukar pilihan
+            resetDeleteButtonState();
+            
+            if (!id) {
+                form.classList.add('hidden');
+                return;
+            }
+            
+            const item = inventoryData.find(x => x.id === id);
+            if (item) {
+                document.getElementById('edit-id').value = item.id;
+                document.getElementById('edit-nama').value = item.name;
+                document.getElementById('edit-unit').value = item.unit;
+                document.getElementById('edit-catatan').value = item.notes || "";
+                form.classList.remove('hidden');
+            }
+        }
+
+        // Submit Kemaskini Stok
+        document.getElementById('form-edit-stok').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const id = parseInt(document.getElementById('edit-id').value);
+            const name = document.getElementById('edit-nama').value.trim().toUpperCase();
+            const unit = document.getElementById('edit-unit').value.trim().toUpperCase();
+            const notes = document.getElementById('edit-catatan').value.trim();
+            
+            const itemIndex = inventoryData.findIndex(x => x.id === id);
+            if (itemIndex > -1) {
+                inventoryData[itemIndex].name = name;
+                inventoryData[itemIndex].unit = unit;
+                inventoryData[itemIndex].notes = notes;
+                
+                saveData();
+                renderTable();
+                closeModal('modal-edit-main');
+                showToast(`Maklumat stok ${name} berjaya dikemaskini!`);
+            }
+        });
+
+        // Logik Butang Padam (Sahkan Tanpa Menggunakan Confirm Box OS)
+        window.handleDeleteClick = function() {
+            const btn = document.getElementById('btn-delete-stok');
+            
+            if (btn.dataset.confirm === "true") {
+                // Tindakan Padam
+                const id = parseInt(document.getElementById('edit-id').value);
+                const itemIndex = inventoryData.findIndex(x => x.id === id);
+                
+                if (itemIndex > -1) {
+                    const itemName = inventoryData[itemIndex].name;
+                    inventoryData.splice(itemIndex, 1); // Padam item
+                    saveData();
+                    renderTable();
+                    closeModal('modal-edit-main');
+                    showToast(`Stok ${itemName} telah berjaya dipadam!`, true);
+                }
+            } else {
+                // Tindakan Pertama (Amaran Pengesahan)
+                btn.dataset.confirm = "true";
+                btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Sahkan Padam?`;
+                btn.classList.remove('bg-red-100', 'text-red-700', 'border-red-300');
+                btn.classList.add('bg-red-600', 'text-white', 'border-red-600', 'animate-pulse');
+                
+                // Kembali ke asal jika tidak diklik dalam 3 saat
+                setTimeout(() => {
+                    const modalActive = document.getElementById('modal-edit-main').classList.contains('modal-active');
+                    if(modalActive && btn.dataset.confirm === "true") {
+                         resetDeleteButtonState();
+                    }
+                }, 3000);
+            }
+        }
+        
+        function resetDeleteButtonState() {
+            const btn = document.getElementById('btn-delete-stok');
+            btn.innerHTML = `<i class="fa-solid fa-trash-can"></i> Padam`;
+            btn.classList.remove('bg-red-600', 'text-white', 'border-red-600', 'animate-pulse');
+            btn.classList.add('bg-red-100', 'text-red-700', 'border-red-300');
+            btn.dataset.confirm = "false";
+        }
+
+
+        // --- STREAMING_CHUNK:Javascript Logic - Transactions & Reset... ---
+
+        // Submit Penerimaan Stok
+        document.getElementById('form-terima').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const tarikh = document.getElementById('terima-tarikh').value;
+            const itemId = parseInt(document.getElementById('terima-item').value);
+            const qty = parseInt(document.getElementById('terima-qty').value);
+            const catatan = document.getElementById('terima-catatan').value.trim();
+            
+            const item = inventoryData.find(x => x.id === itemId);
+            if (item) {
+                item.received += qty;
+                
+                if (catatan) {
+                    item.notes = (item.notes && item.notes !== '-') ? item.notes + " | " + catatan : catatan;
+                }
+                
+                transactionHistory.push({
+                    id: Date.now(),
+                    type: 'TERIMA',
+                    date: tarikh,
+                    itemName: item.name,
+                    qty: qty,
+                    unit: item.unit,
+                    notes: catatan || '-'
+                });
+                
+                saveData();
+                renderTable();
+                closeModal('modal-terima');
+                showToast(`${qty} ${item.unit} ${item.name} berjaya direkodkan.`);
+            }
+        });
+
+        // Submit Pengeluaran Stok
+        document.getElementById('form-keluar').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const tarikh = document.getElementById('keluar-tarikh').value;
+            const itemId = parseInt(document.getElementById('keluar-item').value);
+            const qty = parseInt(document.getElementById('keluar-qty').value);
+            const catatan = document.getElementById('keluar-catatan').value.trim();
+            
+            const item = inventoryData.find(x => x.id === itemId);
+            if (item) {
+                item.issued += qty;
+                
+                if (catatan) {
+                    item.notes = (item.notes && item.notes !== '-') ? item.notes + " | " + catatan : catatan;
+                }
+                
+                transactionHistory.push({
+                    id: Date.now(),
+                    type: 'KELUAR',
+                    date: tarikh,
+                    itemName: item.name,
+                    qty: qty,
+                    unit: item.unit,
+                    notes: catatan || '-'
+                });
+                
+                saveData();
+                renderTable();
+                closeModal('modal-keluar');
+                showToast(`${qty} ${item.unit} ${item.name} berjaya dikeluarkan.`);
+            }
+        });
+
+        // Submit Reset Data
+        document.getElementById('form-reset').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const pwd = document.getElementById('reset-password').value;
+            
+            if (pwd === "12345678") {
+                inventoryData = [];
+                transactionHistory = [];
+                nextId = 1;
+                
+                saveData(); 
+                renderTable();
+                closeModal('modal-reset');
+                showToast("Semua rekod stok telah berjaya dikosongkan!", true);
+            } else {
+                showToast("Kata laluan salah! Tindakan dibatalkan.", true);
+                document.getElementById('reset-password').value = "";
+            }
+        });
+
+        // --- STREAMING_CHUNK:Javascript Logic - History, UI Utilities... ---
+
+        // Render Data Sejarah
+        function renderHistory() {
+            const tbodyTerima = document.getElementById('tbody-sejarah-terima');
+            const tbodyKeluar = document.getElementById('tbody-sejarah-keluar');
+            tbodyTerima.innerHTML = '';
+            tbodyKeluar.innerHTML = '';
+
+            const sortedHistory = [...transactionHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            sortedHistory.forEach(record => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-gray-100 hover:bg-gray-50";
+                
+                const [y, m, d] = record.date.split('-');
+                const formattedDate = `${d}/${m}/${y}`;
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4">${formattedDate}</td>
+                    <td class="py-3 px-4 font-bold text-gray-700">${record.itemName}</td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="pill-number ${record.type === 'TERIMA' ? 'bg-teal-100 text-teal-800' : 'bg-purple-100 text-purple-800'}">${record.qty}</span> 
+                        <span class="text-gray-500 text-xs ml-1">${record.unit}</span>
+                    </td>
+                    <td class="py-3 px-4 text-gray-600">${record.notes}</td>
+                `;
+
+                if (record.type === 'TERIMA') {
+                    tbodyTerima.appendChild(tr);
+                } else {
+                    tbodyKeluar.appendChild(tr);
+                }
+            });
+
+            if (tbodyTerima.innerHTML === '') tbodyTerima.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-gray-400 italic">Tiada rekod penerimaan ditemui.</td></tr>';
+            if (tbodyKeluar.innerHTML === '') tbodyKeluar.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-gray-400 italic">Tiada rekod pengeluaran ditemui.</td></tr>';
+        }
+
+        // Tukar Tab Sejarah
+        window.switchHistoryTab = function(tab) {
+            const btnTerima = document.getElementById('btn-tab-terima');
+            const btnKeluar = document.getElementById('btn-tab-keluar');
+            const contentTerima = document.getElementById('content-terima');
+            const contentKeluar = document.getElementById('content-keluar');
+
+            if (tab === 'terima') {
+                btnTerima.className = "flex-1 py-3 px-4 font-bold text-sm md:text-base transition-colors bg-teal-500 text-white";
+                btnKeluar.className = "flex-1 py-3 px-4 font-bold text-sm md:text-base transition-colors bg-gray-200 text-gray-600 hover:bg-gray-300";
+                contentTerima.classList.remove('hidden');
+                contentKeluar.classList.add('hidden');
+            } else {
+                btnKeluar.className = "flex-1 py-3 px-4 font-bold text-sm md:text-base transition-colors bg-purple-500 text-white";
+                btnTerima.className = "flex-1 py-3 px-4 font-bold text-sm md:text-base transition-colors bg-gray-200 text-gray-600 hover:bg-gray-300";
+                contentKeluar.classList.remove('hidden');
+                contentTerima.classList.add('hidden');
+            }
+        }
+
+        // Muat Turun Excel
+        window.downloadHistoryExcel = function() {
+            if (transactionHistory.length === 0) {
+                showToast("Tiada rekod transaksi untuk dimuat turun.");
+                return;
+            }
+
+            try {
+                const sortedHistory = [...transactionHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+                const exportData = sortedHistory.map(record => {
+                    const [y, m, d] = record.date.split('-');
+                    return {
+                        "Tarikh": `${d}/${m}/${y}`,
+                        "Jenis Transaksi": record.type === 'TERIMA' ? 'Penerimaan' : 'Pengeluaran',
+                        "Jenis Stok": record.itemName,
+                        "Kuantiti": record.qty,
+                        "Unit": record.unit,
+                        "Catatan": record.notes
+                    };
+                });
+
+                const worksheet = XLSX.utils.json_to_sheet(exportData);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Rekod Transaksi");
+
+                const wscols = [{wch: 12}, {wch: 18}, {wch: 25}, {wch: 10}, {wch: 10}, {wch: 40}];
+                worksheet['!cols'] = wscols;
+
+                XLSX.writeFile(workbook, "Rekod_Transaksi_Stok_PPD_Ranau.xlsx");
+                showToast("Rekod transaksi berjaya dimuat turun!");
+            } catch (error) {
+                console.error("Ralat Excel: ", error);
+                showToast("Ralat semasa memuat turun fail Excel.");
+            }
+        }
+
+        // Sistem Notifikasi Toast
+        function showToast(msg, isError = false) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'bg-gray-800 text-white px-6 py-3 rounded-xl shadow-lg transform transition-all duration-300 opacity-0 translate-y-2 flex items-center z-50 pointer-events-none';
+            
+            const icon = isError ? 'fa-triangle-exclamation text-red-400' : 'fa-check-circle text-green-400';
+            toast.innerHTML = `<i class="fa-solid ${icon} mr-2"></i> <span>${msg}</span>`;
+            
+            container.appendChild(toast);
+            
+            requestAnimationFrame(() => {
+                toast.classList.remove('opacity-0', 'translate-y-2');
+            });
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // Initializer
+        document.addEventListener('DOMContentLoaded', () => {
+            renderTable();
+        });
+
+    </script>
+</body>
+</html>
